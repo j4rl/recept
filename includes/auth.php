@@ -24,7 +24,7 @@ function is_logged_in(): bool
 function require_login(): void
 {
     if (!is_logged_in()) {
-        flash('error', 'Du maste logga in for att anvanda den funktionen.');
+        flash('error', 'Du måste logga in för att använda den funktionen.');
         redirect('index.php?page=login');
     }
 }
@@ -44,7 +44,7 @@ function logout_user(): void
 function register_user(string $name, string $email, string $password): bool
 {
     if (mb_strlen($name) < 2) {
-        flash('error', 'Namn maste vara minst 2 tecken.');
+        flash('error', 'Namn måste vara minst 2 tecken.');
         return false;
     }
 
@@ -54,13 +54,13 @@ function register_user(string $name, string $email, string $password): bool
     }
 
     if (strlen($password) < 8) {
-        flash('error', 'Losenord maste vara minst 8 tecken.');
+        flash('error', 'Lösenord måste vara minst 8 tecken.');
         return false;
     }
 
     $existing = db_one('SELECT id FROM users WHERE email = ? LIMIT 1', 's', [$email]);
     if ($existing) {
-        flash('error', 'E-postadressen ar redan registrerad.');
+        flash('error', 'E-postadressen är redan registrerad.');
         return false;
     }
 
@@ -84,11 +84,10 @@ function attempt_login(string $email, string $password): bool
 
     $user = db_one('SELECT id, password_hash FROM users WHERE email = ? LIMIT 1', 's', [strtolower($email)]);
     if (!$user || !password_verify($password, $user['password_hash'])) {
-        flash('error', 'Fel e-post eller losenord.');
+        flash('error', 'Fel e-post eller lösenord.');
         return false;
     }
 
     login_user((int) $user['id']);
     return true;
 }
-

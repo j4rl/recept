@@ -1,11 +1,13 @@
 <?php
 declare(strict_types=1);
 
-$pageTitle = app_config('app_name') . ' - Utforska recept';
+$pageTitle = app_config('app_name') . ' - Hem';
 
 $search = trim((string) ($_GET['q'] ?? ''));
 $categorySlug = trim((string) ($_GET['category'] ?? ''));
 $canCook = isset($_GET['can_cook']) && $_GET['can_cook'] === '1';
+$allowMissing = isset($_GET['allow_missing']) && $_GET['allow_missing'] === '1';
+$mineOnly = isset($_GET['mine']) && $_GET['mine'] === '1';
 
 $viewer = current_user();
 $inventoryEnabled = $viewer && (int) $viewer['inventory_enabled'] === 1;
@@ -22,6 +24,23 @@ $joins = "
         FROM recipe_ingredients
         GROUP BY recipe_id
     ) ri_total ON ri_total.recipe_id = r.id
+    LEFT JOIN (
+        SELECT
+            rc.recipe_id,
+            GROUP_CONCAT(c.name ORDER BY c.name SEPARATOR ', ') AS categories,
+            MIN(c.name) AS primary_category
+        FROM recipe_categories rc
+        INNER JOIN categories c ON c.id = rc.category_id
+        GROUP BY rc.recipe_id
+    ) cat ON cat.recipe_id = r.id
+    LEFT JOIN (
+        SELECT
+            recipe_id,
+            AVG(rating) AS avg_rating,
+            COUNT(*) AS rating_count
+        FROM recipe_ratings
+        GROUP BY recipe_id
+    ) rt ON rt.recipe_id = r.id
 ";
 
 $haveSelect = '0';
@@ -43,169 +62,258 @@ if ($inventoryEnabled) {
 
 if ($search !== '') {
     $term = '%' . $search . '%';
-    $where[] = '(r.title LIKE ? OR r.description LIKE ? OR c.name LIKE ?)';
+    $where[] = '(
+        r.title LIKE ?
+        OR r.description LIKE ?
+        OR EXISTS (
+            SELECT 1
+            FROM recipe_categories rc_s
+            INNER JOIN categories c_s ON c_s.id = rc_s.category_id
+            WHERE rc_s.recipe_id = r.id
+              AND c_s.name LIKE ?
+        )
+    )';
     $types .= 'sss';
     array_push($params, $term, $term, $term);
 }
 
 if ($categorySlug !== '') {
-    $where[] = 'c.slug = ?';
+    $where[] = 'EXISTS (
+        SELECT 1
+        FROM recipe_categories rc_f
+        INNER JOIN categories c_f ON c_f.id = rc_f.category_id
+        WHERE rc_f.recipe_id = r.id
+          AND c_f.slug = ?
+    )';
     $types .= 's';
     $params[] = $categorySlug;
 }
 
 if ($canCook && $inventoryEnabled) {
-    $where[] = '(COALESCE(ri_total.total_ingredients, 0) = 0 OR COALESCE(ri_total.total_ingredients, 0) = ' . $haveSelect . ')';
+    if ($allowMissing) {
+        $where[] = $haveSelect . ' > 0';
+    } else {
+        $where[] = '(COALESCE(ri_total.total_ingredients, 0) = 0 OR COALESCE(ri_total.total_ingredients, 0) = ' . $haveSelect . ')';
+    }
+}
+
+if ($mineOnly && $viewer) {
+    $where[] = 'r.user_id = ?';
+    $types .= 'i';
+    $params[] = (int) $viewer['id'];
 }
 
 $sql = "
     SELECT
         r.id,
         r.title,
-        r.slug,
         r.description,
+        r.image_path,
         r.prep_minutes,
         r.cook_minutes,
         r.servings,
         r.created_at,
-        c.name AS category_name,
-        c.slug AS category_slug,
+        r.is_gluten_free,
+        r.is_lactose_free,
+        r.is_nut_free,
         u.name AS author_name,
+        COALESCE(cat.categories, '') AS category_list,
+        COALESCE(cat.primary_category, 'Okategoriserat') AS primary_category,
+        COALESCE(rt.avg_rating, 0) AS avg_rating,
+        COALESCE(rt.rating_count, 0) AS rating_count,
         COALESCE(ri_total.total_ingredients, 0) AS total_ingredients,
         {$haveSelect} AS have_ingredients
     FROM recipes r
-    INNER JOIN categories c ON c.id = r.category_id
     INNER JOIN users u ON u.id = r.user_id
     {$joins}
     WHERE " . implode(' AND ', $where) . "
     ORDER BY r.created_at DESC
-    LIMIT 60
+    LIMIT 80
 ";
 
 $recipes = db_all($sql, $types, $params);
 $canCookWarning = $canCook && !$inventoryEnabled;
+$isCanCookMode = $canCook && $inventoryEnabled;
+$isAllowMissingMode = $allowMissing && $isCanCookMode;
+
+$popularRecipes = $recipes;
+usort(
+    $popularRecipes,
+    static function (array $a, array $b): int {
+        $countCompare = ((int) $b['rating_count']) <=> ((int) $a['rating_count']);
+        if ($countCompare !== 0) {
+            return $countCompare;
+        }
+
+        $avgCompare = ((float) $b['avg_rating']) <=> ((float) $a['avg_rating']);
+        if ($avgCompare !== 0) {
+            return $avgCompare;
+        }
+
+        return strtotime((string) $b['created_at']) <=> strtotime((string) $a['created_at']);
+    }
+);
+$popularRecipes = array_slice($popularRecipes, 0, 8);
+$latestRecipes = array_slice($recipes, 0, 10);
 ?>
 
-<section class="hero">
-    <div class="hero-copy">
-        <h1>Ditt nya matarkiv</h1>
-        <p>Sok, filtrera och hitta recept for vardag, helg och allt dar emellan.</p>
-    </div>
-    <div class="hero-stats">
-        <div class="hero-stat">
-            <strong><?= e((string) count($recipes)) ?></strong>
-            <span>matchande recept</span>
-        </div>
-        <div class="hero-stat">
-            <strong><?= e((string) count($categories)) ?></strong>
-            <span>kategorier</span>
-        </div>
-    </div>
-</section>
-
-<section class="search-panel">
-    <form method="get" action="index.php" class="search-form">
-        <input type="hidden" name="page" value="home">
-        <input
-            type="search"
-            name="q"
-            value="<?= e($search) ?>"
-            placeholder="Sok pa recept, ingrediens eller kategori"
-            autocomplete="off"
-        >
-        <?php if ($categorySlug !== ''): ?>
-            <input type="hidden" name="category" value="<?= e($categorySlug) ?>">
-        <?php endif; ?>
-        <?php if ($canCook && $inventoryEnabled): ?>
-            <input type="hidden" name="can_cook" value="1">
-        <?php endif; ?>
-        <button type="submit">Sok</button>
-    </form>
-
-    <div class="chip-row">
-        <a href="index.php?page=home<?= $search !== '' ? '&q=' . urlencode($search) : '' ?>" class="chip <?= $categorySlug === '' ? 'is-active' : '' ?>">Alla</a>
-        <?php foreach ($categories as $category): ?>
-            <?php
-            $categoryLink = 'index.php?page=home&category=' . urlencode($category['slug']);
-            if ($search !== '') {
-                $categoryLink .= '&q=' . urlencode($search);
-            }
-            if ($canCook && $inventoryEnabled) {
-                $categoryLink .= '&can_cook=1';
-            }
-            ?>
-            <a
-                href="<?= e($categoryLink) ?>"
-                class="chip <?= $categorySlug === $category['slug'] ? 'is-active' : '' ?>"
-            ><?= e($category['name']) ?></a>
-        <?php endforeach; ?>
-    </div>
-
-    <?php if ($viewer): ?>
-        <?php
-        $cookLink = 'index.php?page=home';
-        $queryBits = [];
-        if ($search !== '') {
-            $queryBits[] = 'q=' . urlencode($search);
-        }
-        if ($categorySlug !== '') {
-            $queryBits[] = 'category=' . urlencode($categorySlug);
-        }
-        if ($canCook && $inventoryEnabled) {
-            $canCook = false;
-        } else {
-            $queryBits[] = 'can_cook=1';
-        }
-        if (count($queryBits) > 0) {
-            $cookLink .= '&' . implode('&', $queryBits);
-        }
-        ?>
-        <a class="secondary-button" href="<?= e($cookLink) ?>">
-            <?= $canCook && $inventoryEnabled ? 'Visa alla recept' : 'Visa recept jag kan laga nu' ?>
-        </a>
-    <?php endif; ?>
-
-    <?php if ($canCookWarning): ?>
-        <p class="inline-warning">Aktivera Skafferi/Kyl/Frys for att filtrera pa recept du kan laga.</p>
-    <?php endif; ?>
-</section>
-
-<section class="recipe-grid">
-    <?php if (count($recipes) === 0): ?>
-        <article class="empty-card">
-            <h2>Inga recept matchade</h2>
-            <p>Testa en annan sokfras eller valj en annan kategori.</p>
-        </article>
-    <?php endif; ?>
-
-    <?php foreach ($recipes as $recipe): ?>
-        <?php
-        $totalTime = minutes_total((int) $recipe['prep_minutes'], (int) $recipe['cook_minutes']);
-        $completion = 0;
-        if ((int) $recipe['total_ingredients'] > 0) {
-            $completion = (int) floor(((int) $recipe['have_ingredients'] / (int) $recipe['total_ingredients']) * 100);
-        }
-        ?>
-        <article class="recipe-card">
-            <div class="recipe-meta">
-                <span class="pill"><?= e($recipe['category_name']) ?></span>
-                <span><?= e((string) $totalTime) ?> min</span>
-            </div>
-            <h2><a href="index.php?page=recipe&id=<?= e((string) $recipe['id']) ?>"><?= e($recipe['title']) ?></a></h2>
-            <p><?= e($recipe['description']) ?></p>
-            <div class="recipe-bottom">
-                <span><?= e($recipe['servings']) ?> port</span>
-                <span>Av <?= e($recipe['author_name']) ?></span>
-            </div>
-
-            <?php if ($inventoryEnabled && (int) $recipe['total_ingredients'] > 0): ?>
-                <div class="progress-row">
-                    <span>Du har <?= e((string) $recipe['have_ingredients']) ?>/<?= e((string) $recipe['total_ingredients']) ?> ingredienser</span>
-                    <div class="progress">
-                        <span style="width: <?= e((string) max(0, min(100, $completion))) ?>%"></span>
-                    </div>
-                </div>
+<section class="home-shell">
+    <div class="home-toolbar">
+        <form method="get" action="index.php" class="filter-bar">
+            <input type="hidden" name="page" value="home">
+            <?php if ($mineOnly): ?>
+                <input type="hidden" name="mine" value="1">
             <?php endif; ?>
-        </article>
-    <?php endforeach; ?>
+
+            <label>
+                <span>Kategori</span>
+                <select name="category">
+                    <option value="">Alla</option>
+                    <?php foreach ($categories as $category): ?>
+                        <option value="<?= e($category['slug']) ?>" <?= $categorySlug === $category['slug'] ? 'selected' : '' ?>>
+                            <?= e($category['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+
+            <label class="search-label">
+                <span>Sök recept</span>
+                <input type="search" name="q" value="<?= e($search) ?>" placeholder="Sök recept...">
+            </label>
+
+            <?php if ($viewer && $inventoryEnabled): ?>
+                <label class="can-cook-checkbox">
+                    <input type="checkbox" name="can_cook" value="1" <?= $isCanCookMode ? 'checked' : '' ?> data-can-cook-checkbox>
+                    <span>Filtrera på ingredienser jag har hemma</span>
+                </label>
+                <label class="can-cook-checkbox">
+                    <input
+                        type="checkbox"
+                        name="allow_missing"
+                        value="1"
+                        <?= $isAllowMissingMode ? 'checked' : '' ?>
+                        <?= $isCanCookMode ? '' : 'disabled' ?>
+                        data-allow-missing-checkbox
+                    >
+                    <span>Visa även recept som saknar ingredienser</span>
+                </label>
+            <?php endif; ?>
+
+            <button type="submit">Filtrera</button>
+        </form>
+
+        <?php if ($canCookWarning): ?>
+            <p class="inline-warning">Aktivera Skafferi/Kyl/Frys för att filtrera på recept du kan laga.</p>
+        <?php endif; ?>
+    </div>
+
+    <section class="home-section">
+        <div class="section-head">
+            <h2>Populära recept</h2>
+        </div>
+
+        <div class="popular-grid">
+            <?php if (count($popularRecipes) === 0): ?>
+                <article class="empty-card">
+                    <h3>Inga recept hittades</h3>
+                    <p>Justera filtret eller publicera ett nytt recept.</p>
+                </article>
+            <?php endif; ?>
+
+            <?php foreach ($popularRecipes as $recipe): ?>
+                <?php
+                $imagePath = recipe_image_url((string) ($recipe['image_path'] ?? ''));
+                $totalTime = minutes_total((int) $recipe['prep_minutes'], (int) $recipe['cook_minutes']);
+                $avgRating = (float) $recipe['avg_rating'];
+                $ratingCount = (int) $recipe['rating_count'];
+                $ratingPercent = max(0, min(100, ($avgRating / 5) * 100));
+                ?>
+                <article class="recipe-tile">
+                    <a href="index.php?page=recipe&id=<?= e((string) $recipe['id']) ?>" class="recipe-tile-link">
+                        <img src="<?= e($imagePath) ?>" alt="<?= e($recipe['title']) ?>" loading="lazy" class="recipe-tile-image">
+                        <div class="recipe-tile-body">
+                            <h3><?= e($recipe['title']) ?></h3>
+                            <p class="recipe-tile-meta">Tid: <?= e((string) $totalTime) ?> min</p>
+                            <div class="rating-line">
+                                <span
+                                    class="star-rating"
+                                    role="img"
+                                    aria-label="Betyg <?= e(number_format($avgRating, 1, ',', ' ')) ?> av 5"
+                                >
+                                    <span class="star-rating-base">★★★★★</span>
+                                    <span class="star-rating-fill" style="width: <?= e(number_format($ratingPercent, 2, '.', '')) ?>%;">★★★★★</span>
+                                </span>
+                                <?php if ($ratingCount > 0): ?>
+                                    <span><?= e(number_format($avgRating, 1, ',', ' ')) ?> (<?= e((string) $ratingCount) ?>)</span>
+                                <?php else: ?>
+                                    <span>Inga röster ännu</span>
+                                <?php endif; ?>
+                            </div>
+                            <?php if ($isCanCookMode): ?>
+                                <?php
+                                $haveIngredients = (int) $recipe['have_ingredients'];
+                                $totalIngredients = (int) $recipe['total_ingredients'];
+                                $missingIngredients = max(0, $totalIngredients - $haveIngredients);
+                                ?>
+                                <p class="inventory-match-line">
+                                    Har <?= e((string) $haveIngredients) ?> av <?= e((string) $totalIngredients) ?> ingredienser
+                                    <?php if ($missingIngredients > 0): ?>
+                                        | saknar <?= e((string) $missingIngredients) ?>
+                                    <?php else: ?>
+                                        | komplett
+                                    <?php endif; ?>
+                                </p>
+                            <?php endif; ?>
+                            <div class="badge-row">
+                                <?php if ((int) $recipe['is_gluten_free'] === 1): ?>
+                                    <img src="assets/img/nogluten.png" alt="Glutenfri" title="Glutenfri" class="food-badge-icon" width="16" height="16" loading="lazy">
+                                <?php endif; ?>
+                                <?php if ((int) $recipe['is_lactose_free'] === 1): ?>
+                                    <img src="assets/img/nolactose.png" alt="Laktosfri" title="Laktosfri" class="food-badge-icon" width="16" height="16" loading="lazy">
+                                <?php endif; ?>
+                                <?php if ((int) $recipe['is_nut_free'] === 1): ?>
+                                    <img src="assets/img/nonut.png" alt="Utan nötter" title="Utan nötter" class="food-badge-icon" width="16" height="16" loading="lazy">
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </a>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    </section>
+
+    <section class="home-section">
+        <div class="section-head">
+            <h2>Senaste recept</h2>
+        </div>
+
+        <div class="latest-list">
+            <?php foreach ($latestRecipes as $recipe): ?>
+                <?php
+                $totalTime = minutes_total((int) $recipe['prep_minutes'], (int) $recipe['cook_minutes']);
+                $recipeCategories = array_filter(array_map('trim', explode(',', (string) $recipe['category_list'])));
+                ?>
+                <article class="latest-row">
+                    <div>
+                        <h3><?= e($recipe['title']) ?></h3>
+                        <p>
+                            <?= e((string) $totalTime) ?> min
+                            <?php if (count($recipeCategories) > 0): ?>
+                                | <?= e(implode(', ', $recipeCategories)) ?>
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                    <a href="index.php?page=recipe&id=<?= e((string) $recipe['id']) ?>" class="view-button">Visa recept</a>
+                </article>
+            <?php endforeach; ?>
+
+            <?php if (count($latestRecipes) === 0): ?>
+                <article class="empty-card">
+                    <h3>Inga recept ännu</h3>
+                    <p>Logga in och publicera det första receptet.</p>
+                </article>
+            <?php endif; ?>
+        </div>
+    </section>
 </section>

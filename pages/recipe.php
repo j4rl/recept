@@ -5,28 +5,53 @@ $recipeId = (int) ($_GET['id'] ?? 0);
 $viewer = current_user();
 $inventoryEnabled = $viewer && (int) $viewer['inventory_enabled'] === 1;
 
-$recipe = db_one(
-    'SELECT
+$recipeQuery = "
+    SELECT
         r.id,
         r.title,
         r.description,
+        r.image_path,
         r.instructions,
         r.prep_minutes,
         r.cook_minutes,
         r.servings,
         r.created_at,
-        c.id AS category_id,
-        c.name AS category_name,
-        c.slug AS category_slug,
-        u.name AS author_name
+        r.is_gluten_free,
+        r.is_lactose_free,
+        r.is_nut_free,
+        u.name AS author_name,
+        COALESCE(cat.categories, '') AS category_list,
+        COALESCE(rt.avg_rating, 0) AS avg_rating,
+        COALESCE(rt.rating_count, 0) AS rating_count
+        " . ($viewer ? ', ur.rating AS user_rating' : ', NULL AS user_rating') . "
      FROM recipes r
-     INNER JOIN categories c ON c.id = r.category_id
      INNER JOIN users u ON u.id = r.user_id
+     LEFT JOIN (
+        SELECT
+            rc.recipe_id,
+            GROUP_CONCAT(c.name ORDER BY c.name SEPARATOR ', ') AS categories
+        FROM recipe_categories rc
+        INNER JOIN categories c ON c.id = rc.category_id
+        GROUP BY rc.recipe_id
+     ) cat ON cat.recipe_id = r.id
+     LEFT JOIN (
+        SELECT
+            recipe_id,
+            AVG(rating) AS avg_rating,
+            COUNT(*) AS rating_count
+        FROM recipe_ratings
+        GROUP BY recipe_id
+     ) rt ON rt.recipe_id = r.id
+     " . ($viewer ? 'LEFT JOIN recipe_ratings ur ON ur.recipe_id = r.id AND ur.user_id = ?' : '') . "
      WHERE r.id = ? AND r.is_published = 1
-     LIMIT 1',
-    'i',
-    [$recipeId]
-);
+     LIMIT 1
+";
+
+if ($viewer) {
+    $recipe = db_one($recipeQuery, 'ii', [(int) $viewer['id'], $recipeId]);
+} else {
+    $recipe = db_one($recipeQuery, 'i', [$recipeId]);
+}
 
 if (!$recipe) {
     http_response_code(404);
@@ -34,8 +59,8 @@ if (!$recipe) {
     ?>
     <section class="empty-card">
         <h1>Receptet hittades inte</h1>
-        <p>Det kan ha tagits bort eller sa ar lanken fel.</p>
-        <a class="secondary-button" href="index.php">Till receptoversikten</a>
+        <p>Det kan ha tagits bort eller så är länken fel.</p>
+        <a class="secondary-button" href="index.php">Till receptöversikten</a>
     </section>
     <?php
     return;
@@ -80,13 +105,20 @@ if ($inventoryEnabled) {
 }
 
 $relatedRecipes = db_all(
-    'SELECT id, title, description
-     FROM recipes
-     WHERE category_id = ? AND id <> ? AND is_published = 1
-     ORDER BY created_at DESC
+    'SELECT DISTINCT r2.id, r2.title, r2.description
+     FROM recipes r2
+     INNER JOIN recipe_categories rc2 ON rc2.recipe_id = r2.id
+     WHERE r2.id <> ?
+       AND r2.is_published = 1
+       AND rc2.category_id IN (
+            SELECT category_id
+            FROM recipe_categories
+            WHERE recipe_id = ?
+       )
+     ORDER BY r2.created_at DESC
      LIMIT 4',
     'ii',
-    [(int) $recipe['category_id'], $recipeId]
+    [$recipeId, $recipeId]
 );
 
 $haveCount = 0;
@@ -96,21 +128,107 @@ foreach ($ingredients as $ingredient) {
 
 $ingredientTotal = count($ingredients);
 $completion = $ingredientTotal > 0 ? (int) floor(($haveCount / $ingredientTotal) * 100) : 0;
+
+$avgRating = (float) $recipe['avg_rating'];
+$ratingCount = (int) $recipe['rating_count'];
+$ratingPercent = max(0, min(100, ($avgRating / 5) * 100));
+$userRating = $viewer ? (int) ($recipe['user_rating'] ?? 0) : 0;
+$recipeCategories = array_filter(array_map('trim', explode(',', (string) $recipe['category_list'])));
+$recipeImage = recipe_image_url((string) ($recipe['image_path'] ?? ''));
+$baseServings = max(1, (int) $recipe['servings']);
+$locationMeta = [
+    'pantry' => ['label' => 'Skafferi', 'icon' => 'assets/img/skaff.png'],
+    'fridge' => ['label' => 'Kylskåp', 'icon' => 'assets/img/kyl.png'],
+    'freezer' => ['label' => 'Frys', 'icon' => 'assets/img/frys.png'],
+];
 ?>
 
 <article class="recipe-detail">
     <header class="detail-head">
+        <figure class="detail-image-wrap">
+            <img src="<?= e($recipeImage) ?>" alt="<?= e($recipe['title']) ?>" class="detail-image" loading="lazy">
+        </figure>
+
         <div>
-            <span class="pill"><?= e($recipe['category_name']) ?></span>
+            <?php if (count($recipeCategories) > 0): ?>
+                <div class="badge-row">
+                    <?php foreach ($recipeCategories as $categoryName): ?>
+                        <span class="pill"><?= e($categoryName) ?></span>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+
             <h1><?= e($recipe['title']) ?></h1>
             <p><?= e($recipe['description']) ?></p>
+
+            <div class="rating-line rating-line-large">
+                <span
+                    class="star-rating"
+                    role="img"
+                    aria-label="Betyg <?= e(number_format($avgRating, 1, ',', ' ')) ?> av 5"
+                >
+                    <span class="star-rating-base">★★★★★</span>
+                    <span class="star-rating-fill" style="width: <?= e(number_format($ratingPercent, 2, '.', '')) ?>%;">★★★★★</span>
+                </span>
+                <?php if ($ratingCount > 0): ?>
+                    <span><?= e(number_format($avgRating, 1, ',', ' ')) ?>/5 baserat på <?= e((string) $ratingCount) ?> röster</span>
+                <?php else: ?>
+                    <span>Inga röster ännu</span>
+                <?php endif; ?>
+            </div>
+
+            <div class="badge-row">
+                <?php if ((int) $recipe['is_gluten_free'] === 1): ?>
+                    <img src="assets/img/nogluten.png" alt="Glutenfri" title="Glutenfri" class="food-badge-icon" width="16" height="16" loading="lazy">
+                <?php endif; ?>
+                <?php if ((int) $recipe['is_lactose_free'] === 1): ?>
+                    <img src="assets/img/nolactose.png" alt="Laktosfri" title="Laktosfri" class="food-badge-icon" width="16" height="16" loading="lazy">
+                <?php endif; ?>
+                <?php if ((int) $recipe['is_nut_free'] === 1): ?>
+                    <img src="assets/img/nonut.png" alt="Utan nötter" title="Utan nötter" class="food-badge-icon" width="16" height="16" loading="lazy">
+                <?php endif; ?>
+            </div>
         </div>
+
         <div class="detail-facts">
-            <div><strong><?= e((string) $recipe['servings']) ?></strong><span>port</span></div>
+            <div><strong data-current-servings><?= e((string) $baseServings) ?></strong><span>port</span></div>
             <div><strong><?= e((string) minutes_total((int) $recipe['prep_minutes'], (int) $recipe['cook_minutes'])) ?></strong><span>min</span></div>
             <div><strong><?= e($recipe['author_name']) ?></strong><span>skapare</span></div>
         </div>
     </header>
+
+    <?php if ($viewer): ?>
+        <section class="rating-panel">
+            <h2>Rösta med stjärnor</h2>
+            <form method="post" action="index.php" class="star-form">
+                <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="action" value="rate_recipe">
+                <input type="hidden" name="recipe_id" value="<?= e((string) $recipeId) ?>">
+                <input type="hidden" name="redirect_to" value="index.php?page=recipe&id=<?= e((string) $recipeId) ?>">
+
+                <div class="star-buttons">
+                    <?php for ($star = 1; $star <= 5; $star++): ?>
+                        <button
+                            type="submit"
+                            name="rating"
+                            value="<?= e((string) $star) ?>"
+                            class="star-submit <?= $userRating === $star ? 'is-active' : '' ?>"
+                            title="Sätt <?= e((string) $star) ?> stjärnor"
+                        >★</button>
+                    <?php endfor; ?>
+                </div>
+            </form>
+            <?php if ($userRating > 0): ?>
+                <p>Din nuvarande röst: <?= e((string) $userRating) ?>/5</p>
+            <?php else: ?>
+                <p>Du har inte röstat än.</p>
+            <?php endif; ?>
+        </section>
+    <?php else: ?>
+        <section class="rating-panel">
+            <p><a href="index.php?page=login">Logga in</a> för att rösta med stjärnor.</p>
+        </section>
+    <?php endif; ?>
 
     <?php if ($inventoryEnabled && $ingredientTotal > 0): ?>
         <section class="detail-progress">
@@ -124,17 +242,49 @@ $completion = $ingredientTotal > 0 ? (int) floor(($haveCount / $ingredientTotal)
     <section class="detail-columns">
         <div class="detail-card">
             <h2>Ingredienser</h2>
+            <div class="serving-scaler" data-serving-scaler data-base-servings="<?= e((string) $baseServings) ?>">
+                <p>Anpassa portioner</p>
+                <div class="serving-controls">
+                    <button type="button" class="serving-step" data-serving-decrease aria-label="Minska antal portioner">-</button>
+                    <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value="<?= e((string) $baseServings) ?>"
+                        class="serving-input"
+                        data-serving-input
+                        aria-label="Antal portioner"
+                    >
+                    <button type="button" class="serving-step" data-serving-increase aria-label="Öka antal portioner">+</button>
+                </div>
+                <small>Ingrediensmängderna räknas om automatiskt.</small>
+            </div>
             <ul class="ingredient-list">
                 <?php foreach ($ingredients as $ingredient): ?>
                     <li class="<?= (int) $ingredient['has_ingredient'] === 1 ? 'have-it' : '' ?>">
                         <div>
                             <strong><?= e($ingredient['name']) ?></strong>
                             <?php if (!empty($ingredient['quantity'])): ?>
-                                <span><?= e($ingredient['quantity']) ?></span>
+                                <span class="ingredient-qty" data-scalable-qty data-original-qty="<?= e((string) $ingredient['quantity']) ?>"><?= e($ingredient['quantity']) ?></span>
                             <?php endif; ?>
                         </div>
                         <?php if ($inventoryEnabled && (int) $ingredient['has_ingredient'] === 1): ?>
-                            <small>Finns i: <?= e((string) $ingredient['locations']) ?></small>
+                            <?php $locationKeys = array_filter(array_map('trim', explode(',', (string) $ingredient['locations']))); ?>
+                            <small class="ingredient-locations">
+                                <span>Finns i:</span>
+                                <?php foreach ($locationKeys as $locationKey): ?>
+                                    <?php if (isset($locationMeta[$locationKey])): ?>
+                                        <img
+                                            src="<?= e($locationMeta[$locationKey]['icon']) ?>"
+                                            alt="<?= e($locationMeta[$locationKey]['label']) ?>"
+                                            title="<?= e($locationMeta[$locationKey]['label']) ?>"
+                                            class="location-icon location-icon-sm"
+                                            width="20"
+                                            height="20"
+                                        >
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </small>
                         <?php endif; ?>
                     </li>
                 <?php endforeach; ?>
@@ -142,7 +292,7 @@ $completion = $ingredientTotal > 0 ? (int) floor(($haveCount / $ingredientTotal)
         </div>
 
         <div class="detail-card">
-            <h2>Gor sa har</h2>
+            <h2>Gör så här</h2>
             <p class="instructions"><?= nl2br(e($recipe['instructions'])) ?></p>
         </div>
     </section>
@@ -150,7 +300,7 @@ $completion = $ingredientTotal > 0 ? (int) floor(($haveCount / $ingredientTotal)
 
 <?php if (count($relatedRecipes) > 0): ?>
     <section class="related-section">
-        <h2>Fler recept i samma kategori</h2>
+        <h2>Fler recept i samma kategorier</h2>
         <div class="recipe-grid compact">
             <?php foreach ($relatedRecipes as $related): ?>
                 <article class="recipe-card">
@@ -161,4 +311,3 @@ $completion = $ingredientTotal > 0 ? (int) floor(($haveCount / $ingredientTotal)
         </div>
     </section>
 <?php endif; ?>
-

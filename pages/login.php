@@ -20,7 +20,7 @@ $pageTitle = app_config('app_name') . ' - Logga in';
         <label for="email">E-post</label>
         <input id="email" name="email" type="email" required autocomplete="email">
 
-        <label for="password">Losenord</label>
+        <label for="password">Lösenord</label>
         <input id="password" name="password" type="password" required autocomplete="current-password">
 
         <button type="submit">Logga in</button>
@@ -28,4 +28,3 @@ $pageTitle = app_config('app_name') . ' - Logga in';
 
     <p class="form-alt">Har du inget konto? <a href="index.php?page=register">Skapa konto</a></p>
 </section>
-

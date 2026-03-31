@@ -101,3 +101,40 @@ function minutes_total(?int $prep, ?int $cook): int
     return max(0, (int) $prep) + max(0, (int) $cook);
 }
 
+function uploads_base_dir(): string
+{
+    $path = (string) app_config('upload_base_dir', dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads');
+
+    return rtrim($path, "\\/");
+}
+
+function uploads_base_url(): string
+{
+    $base = trim((string) app_config('upload_base_url', 'uploads'));
+    $base = str_replace('\\', '/', $base);
+    $base = trim($base, '/');
+
+    return $base !== '' ? $base : 'uploads';
+}
+
+function recipe_upload_dir(): string
+{
+    return uploads_base_dir() . DIRECTORY_SEPARATOR . 'recipes';
+}
+
+function recipe_image_db_path(string $filename): string
+{
+    return uploads_base_url() . '/recipes/' . ltrim($filename, '/');
+}
+
+function recipe_image_url(?string $storedPath): string
+{
+    $path = trim((string) $storedPath);
+    if ($path === '') {
+        return 'assets/img/placeholder-meal.svg';
+    }
+
+    $path = str_replace('\\', '/', $path);
+
+    return ltrim($path, '/');
+}

@@ -23,10 +23,10 @@ $pageTitle = app_config('app_name') . ' - Skapa konto';
         <label for="email">E-post</label>
         <input id="email" name="email" type="email" required autocomplete="email">
 
-        <label for="password">Losenord</label>
+        <label for="password">Lösenord</label>
         <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password">
 
-        <label for="password_confirm">Bekrafta losenord</label>
+        <label for="password_confirm">Bekräfta lösenord</label>
         <input id="password_confirm" name="password_confirm" type="password" required minlength="8" autocomplete="new-password">
 
         <button type="submit">Skapa konto</button>
@@ -34,4 +34,3 @@ $pageTitle = app_config('app_name') . ' - Skapa konto';
 
     <p class="form-alt">Har du redan konto? <a href="index.php?page=login">Logga in</a></p>
 </section>
-

@@ -22,7 +22,11 @@ function db(): mysqli
     }
 
     if (!$connection->set_charset('utf8mb4')) {
-        throw new RuntimeException('Kunde inte satt teckenkodning: ' . $connection->error);
+        throw new RuntimeException('Kunde inte sätta teckenkodning: ' . $connection->error);
+    }
+
+    if (!$connection->query("SET collation_connection = 'utf8mb4_unicode_ci'")) {
+        throw new RuntimeException('Kunde inte sätta anslutningssortering: ' . $connection->error);
     }
 
     return $connection;
@@ -33,7 +37,7 @@ function db_query(string $sql, string $types = '', array $params = []): mysqli_s
     $statement = db()->prepare($sql);
 
     if (!$statement) {
-        throw new RuntimeException('Kunde inte forbereda SQL: ' . db()->error);
+        throw new RuntimeException('Kunde inte förbereda SQL: ' . db()->error);
     }
 
     if ($types !== '') {
@@ -96,4 +100,3 @@ function db_bind(mysqli_stmt $statement, string $types, array $params): void
         throw new RuntimeException('Kunde inte binda parametrar: ' . $statement->error);
     }
 }
-
