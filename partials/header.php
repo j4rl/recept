@@ -4,7 +4,6 @@ declare(strict_types=1);
 $viewer = current_user();
 $flashMessages = consume_flash();
 $isMinePage = $page === 'home' && (($_GET['mine'] ?? '') === '1');
-$isCategoryPage = $page === 'home' && (($_GET['category'] ?? '') !== '');
 ?>
 <!doctype html>
 <html lang="sv">
@@ -46,11 +45,9 @@ $isCategoryPage = $page === 'home' && (($_GET['category'] ?? '') !== '');
             <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-label="Meny">Meny</button>
 
             <nav class="site-nav" data-mobile-nav>
-                <a href="index.php" class="<?= $page === 'home' && !$isMinePage && !$isCategoryPage ? 'is-active' : '' ?>">Hem</a>
-                <a href="index.php?page=home" class="<?= $isCategoryPage ? 'is-active' : '' ?>">Kategorier</a>
+                <a href="index.php?page=home" class="<?= $page === 'home' && !$isMinePage ? 'is-active' : '' ?>">Hem</a>
                 <?php if ($viewer): ?>
                     <a href="index.php?page=home&mine=1" class="<?= $isMinePage ? 'is-active' : '' ?>">Mina recept</a>
-                    <a href="index.php?page=create" class="<?= $page === 'create' ? 'is-active' : '' ?>">Publicera</a>
                     <a href="index.php?page=inventory" class="<?= $page === 'inventory' ? 'is-active' : '' ?>">Skafferi/Kyl/Frys</a>
                     <form action="index.php" method="post" class="inline-form">
                         <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">

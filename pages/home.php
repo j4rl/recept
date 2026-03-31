@@ -208,6 +208,12 @@ $latestRecipes = array_slice($recipes, 0, 10);
         <?php endif; ?>
     </div>
 
+    <?php if ($viewer && $mineOnly): ?>
+        <div class="mine-actions">
+            <a href="index.php?page=create" class="secondary-button">Publicera recept</a>
+        </div>
+    <?php endif; ?>
+
     <section class="home-section">
         <div class="section-head">
             <h2>Populära recept</h2>
@@ -294,7 +300,7 @@ $latestRecipes = array_slice($recipes, 0, 10);
                 $totalTime = minutes_total((int) $recipe['prep_minutes'], (int) $recipe['cook_minutes']);
                 $recipeCategories = array_filter(array_map('trim', explode(',', (string) $recipe['category_list'])));
                 ?>
-                <article class="latest-row">
+                <a href="index.php?page=recipe&id=<?= e((string) $recipe['id']) ?>" class="latest-row">
                     <div>
                         <h3><?= e($recipe['title']) ?></h3>
                         <p>
@@ -304,8 +310,7 @@ $latestRecipes = array_slice($recipes, 0, 10);
                             <?php endif; ?>
                         </p>
                     </div>
-                    <a href="index.php?page=recipe&id=<?= e((string) $recipe['id']) ?>" class="view-button">Visa recept</a>
-                </article>
+                </a>
             <?php endforeach; ?>
 
             <?php if (count($latestRecipes) === 0): ?>
