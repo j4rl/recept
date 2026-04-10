@@ -9,8 +9,10 @@ function current_user(): ?array
         return null;
     }
 
+    $roleSelect = db_column_exists('users', 'role') ? 'role' : "'user' AS role";
+
     return db_one(
-        'SELECT id, name, email, inventory_enabled, created_at FROM users WHERE id = ? LIMIT 1',
+        "SELECT id, name, email, inventory_enabled, {$roleSelect}, created_at FROM users WHERE id = ? LIMIT 1",
         'i',
         [(int) $userId]
     );
@@ -90,4 +92,20 @@ function attempt_login(string $email, string $password): bool
 
     login_user((int) $user['id']);
     return true;
+}
+
+function is_admin(?array $user = null): bool
+{
+    $candidate = $user ?? current_user();
+
+    return $candidate !== null && (($candidate['role'] ?? 'user') === 'admin');
+}
+
+function can_manage_recipe(?array $user, array $recipe): bool
+{
+    if ($user === null) {
+        return false;
+    }
+
+    return is_admin($user) || (int) ($recipe['user_id'] ?? 0) === (int) $user['id'];
 }

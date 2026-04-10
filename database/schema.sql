@@ -11,9 +11,12 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(80) NOT NULL,
     email VARCHAR(190) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    role ENUM('user', 'admin') NOT NULL DEFAULT 'user',
     inventory_enabled TINYINT(1) NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role ENUM('user', 'admin') NOT NULL DEFAULT 'user';
 
 CREATE TABLE IF NOT EXISTS categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -118,6 +121,72 @@ CREATE TABLE IF NOT EXISTS recipe_ratings (
     INDEX idx_recipe_ratings_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS recipe_favorites (
+    user_id INT NOT NULL,
+    recipe_id INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, recipe_id),
+    CONSTRAINT fk_recipe_favorites_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_recipe_favorites_recipe
+        FOREIGN KEY (recipe_id) REFERENCES recipes(id)
+        ON DELETE CASCADE,
+    INDEX idx_recipe_favorites_recipe (recipe_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS meal_plan_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    recipe_id INT NOT NULL,
+    planned_date DATE NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_meal_plan_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_meal_plan_recipe
+        FOREIGN KEY (recipe_id) REFERENCES recipes(id)
+        ON DELETE CASCADE,
+    UNIQUE KEY uniq_meal_plan_item (user_id, recipe_id, planned_date),
+    INDEX idx_meal_plan_user_date (user_id, planned_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS shopping_list_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    recipe_id INT DEFAULT NULL,
+    ingredient_id INT DEFAULT NULL,
+    ingredient_name VARCHAR(120) NOT NULL,
+    quantity VARCHAR(160) DEFAULT NULL,
+    is_checked TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_shopping_list_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_shopping_list_recipe
+        FOREIGN KEY (recipe_id) REFERENCES recipes(id)
+        ON DELETE SET NULL,
+    CONSTRAINT fk_shopping_list_ingredient
+        FOREIGN KEY (ingredient_id) REFERENCES ingredients(id)
+        ON DELETE SET NULL,
+    INDEX idx_shopping_list_user_checked (user_id, is_checked),
+    INDEX idx_shopping_list_user_recipe (user_id, recipe_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS google_keep_tokens (
+    user_id INT NOT NULL PRIMARY KEY,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT DEFAULT NULL,
+    scope VARCHAR(500) DEFAULT NULL,
+    token_type VARCHAR(32) DEFAULT NULL,
+    expires_at DATETIME DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_google_keep_tokens_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT INTO categories (name, slug) VALUES
     ('Förrätter', 'forratter'),
     ('Varmrätter', 'varmratter'),
@@ -143,3 +212,7 @@ ALTER TABLE ingredients CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode
 ALTER TABLE recipe_ingredients CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE user_inventory CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE recipe_ratings CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE recipe_favorites CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE meal_plan_items CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE shopping_list_items CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE google_keep_tokens CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

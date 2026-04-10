@@ -101,6 +101,8 @@ a {
     display: flex;
     align-items: center;
     gap: 0.45rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .site-nav a,
@@ -371,6 +373,48 @@ button:hover,
     font-size: 0.88rem;
 }
 
+.recipe-of-day-card {
+    display: grid;
+    grid-template-columns: minmax(260px, 360px) 1fr;
+    gap: 1rem;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--bg-elev);
+    overflow: hidden;
+}
+
+.recipe-of-day-image {
+    width: 100%;
+    height: 100%;
+    min-height: 240px;
+    object-fit: cover;
+    display: block;
+}
+
+.recipe-of-day-body {
+    padding: 1rem;
+    display: grid;
+    gap: 0.6rem;
+}
+
+.recipe-of-day-body h3 {
+    margin: 0;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.7rem;
+}
+
+.recipe-of-day-body p {
+    margin: 0;
+}
+
+.recipe-of-day-kicker {
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+}
+
 .inventory-match-line {
     margin: 0.28rem 0 0;
     color: var(--ink-soft);
@@ -569,6 +613,25 @@ button:hover,
     margin: 0.22rem 0 0;
     color: var(--ink-soft);
     font-size: 0.85rem;
+}
+
+.form-intro {
+    margin-top: 0.2rem;
+    color: var(--ink-soft);
+}
+
+.current-image-preview {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.current-image-preview img {
+    width: min(100%, 340px);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--bg-soft);
+    display: block;
+    object-fit: cover;
 }
 
 .category-fieldset,
@@ -947,6 +1010,69 @@ button:hover,
     font-size: 1.12rem;
 }
 
+.recipe-manage-panel {
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--accent) 6%, var(--bg-elev));
+    box-shadow: var(--shadow);
+    padding: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+}
+
+.recipe-manage-panel h2 {
+    margin: 0;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.12rem;
+}
+
+.recipe-manage-panel p {
+    margin: 0.2rem 0 0;
+    color: var(--ink-soft);
+}
+
+.recipe-action-panel {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--bg-elev);
+    box-shadow: var(--shadow);
+    padding: 0.9rem;
+    display: flex;
+    gap: 0.65rem;
+    align-items: end;
+    flex-wrap: wrap;
+}
+
+.recipe-inline-form {
+    display: inline-flex;
+    align-items: end;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.recipe-inline-form label {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.recipe-inline-form span {
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+}
+
+.recipe-manage-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.recipe-manage-actions form {
+    margin: 0;
+}
+
 .star-form {
     margin-top: 0.55rem;
 }
@@ -1025,6 +1151,194 @@ button:hover,
     min-width: 3ch;
 }
 
+.favorite-card {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.planner-shell {
+    display: grid;
+    gap: 1rem;
+}
+
+.planner-toolbar {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.planner-toolbar h1 {
+    margin: 0;
+    font-family: 'Outfit', sans-serif;
+}
+
+.planner-week-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    color: var(--ink-soft);
+}
+
+.planner-add-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 180px auto;
+    gap: 0.65rem;
+    align-items: end;
+}
+
+.planner-add-form label {
+    display: grid;
+    gap: 0.28rem;
+}
+
+.planner-add-form span {
+    color: var(--ink-soft);
+    font-size: 0.86rem;
+}
+
+.planner-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.7rem;
+}
+
+.planner-day {
+    display: grid;
+    gap: 0.7rem;
+}
+
+.planner-day-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.planner-day-head h2 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.planner-day-head span {
+    color: var(--ink-soft);
+    font-size: 0.86rem;
+}
+
+.planner-day-items {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.planner-item {
+    display: grid;
+    gap: 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg-soft);
+    padding: 0.65rem;
+}
+
+.planner-item h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.planner-item p,
+.planner-item small {
+    margin: 0.2rem 0 0;
+    color: var(--ink-soft);
+}
+
+.keep-status-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.shopping-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+    margin-bottom: 0.8rem;
+}
+
+.shopping-head h2 {
+    margin: 0;
+    font-family: 'Outfit', sans-serif;
+}
+
+.shopping-summary {
+    display: inline-flex;
+    gap: 0.7rem;
+    color: var(--ink-soft);
+}
+
+.shopping-list,
+.history-list {
+    display: grid;
+    gap: 0.65rem;
+}
+
+.shopping-item,
+.history-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.75rem;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--bg-soft);
+    padding: 0.75rem;
+}
+
+.shopping-item.is-checked {
+    opacity: 0.72;
+}
+
+.shopping-check-button {
+    min-width: 78px;
+}
+
+.shopping-item-body {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.shopping-item-body span,
+.shopping-item-body small,
+.history-meta span {
+    color: var(--ink-soft);
+}
+
+.shopping-clear-form {
+    margin-top: 0.8rem;
+}
+
+.history-item {
+    grid-template-columns: 1fr auto;
+}
+
+.history-item h2 {
+    margin: 0;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.1rem;
+}
+
+.history-item p {
+    margin: 0.2rem 0 0;
+    color: var(--ink-soft);
+}
+
+.history-meta {
+    display: grid;
+    gap: 0.22rem;
+    text-align: right;
+}
+
 .site-footer {
     margin-top: auto;
     padding: 1rem 0;
@@ -1057,8 +1371,33 @@ button:hover,
         grid-template-columns: 1fr;
     }
 
+    .recipe-of-day-card,
     .inventory-add-form {
         grid-template-columns: 1fr;
+    }
+
+    .recipe-manage-panel {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .planner-toolbar,
+    .keep-status-panel,
+    .shopping-head,
+    .shopping-item,
+    .history-item {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .planner-add-form,
+    .planner-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .history-meta {
+        text-align: left;
     }
 }
 

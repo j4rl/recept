@@ -8,6 +8,7 @@ $inventoryEnabled = $viewer && (int) $viewer['inventory_enabled'] === 1;
 $recipeQuery = "
     SELECT
         r.id,
+        r.user_id,
         r.title,
         r.description,
         r.image_path,
@@ -128,6 +129,7 @@ foreach ($ingredients as $ingredient) {
 
 $ingredientTotal = count($ingredients);
 $completion = $ingredientTotal > 0 ? (int) floor(($haveCount / $ingredientTotal) * 100) : 0;
+$missingCount = max(0, $ingredientTotal - $haveCount);
 
 $avgRating = (float) $recipe['avg_rating'];
 $ratingCount = (int) $recipe['rating_count'];
@@ -136,6 +138,19 @@ $userRating = $viewer ? (int) ($recipe['user_rating'] ?? 0) : 0;
 $recipeCategories = array_filter(array_map('trim', explode(',', (string) $recipe['category_list'])));
 $recipeImage = recipe_image_url((string) ($recipe['image_path'] ?? ''));
 $baseServings = max(1, (int) $recipe['servings']);
+$canManageRecipe = can_manage_recipe($viewer, $recipe);
+$isFavorite = false;
+$googleKeepConnected = false;
+
+if ($viewer) {
+    $isFavorite = db_one(
+        'SELECT 1 FROM recipe_favorites WHERE user_id = ? AND recipe_id = ? LIMIT 1',
+        'ii',
+        [(int) $viewer['id'], $recipeId]
+    ) !== null;
+    $googleKeepConnected = google_keep_is_configured() && google_keep_is_connected((int) $viewer['id']);
+}
+
 $locationMeta = [
     'pantry' => ['label' => 'Skafferi', 'icon' => 'assets/img/skaff.png'],
     'fridge' => ['label' => 'Kylskåp', 'icon' => 'assets/img/kyl.png'],
@@ -196,6 +211,82 @@ $locationMeta = [
             <div><strong><?= e($recipe['author_name']) ?></strong><span>skapare</span></div>
         </div>
     </header>
+
+    <?php if ($viewer): ?>
+        <section class="recipe-action-panel">
+            <form method="post" action="index.php">
+                <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="action" value="toggle_favorite">
+                <input type="hidden" name="recipe_id" value="<?= e((string) $recipeId) ?>">
+                <input type="hidden" name="redirect_to" value="index.php?page=recipe&id=<?= e((string) $recipeId) ?>">
+                <button type="submit" class="<?= $isFavorite ? 'danger-button' : 'secondary-button' ?>">
+                    <?= $isFavorite ? 'Ta bort favorit' : 'Spara som favorit' ?>
+                </button>
+            </form>
+
+            <form method="post" action="index.php" class="recipe-inline-form">
+                <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="action" value="add_meal_plan_item">
+                <input type="hidden" name="recipe_id" value="<?= e((string) $recipeId) ?>">
+                <input type="hidden" name="redirect_to" value="index.php?page=recipe&id=<?= e((string) $recipeId) ?>">
+                <label>
+                    <span>Lägg i veckoplan</span>
+                    <input type="date" name="planned_date" value="<?= e(date('Y-m-d')) ?>" required>
+                </label>
+                <button type="submit">Planera</button>
+            </form>
+
+            <form method="post" action="index.php">
+                <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="action" value="add_recipe_to_shopping_list">
+                <input type="hidden" name="recipe_id" value="<?= e((string) $recipeId) ?>">
+                <input type="hidden" name="redirect_to" value="index.php?page=recipe&id=<?= e((string) $recipeId) ?>">
+                <button type="submit">Lägg alla i inköpslista</button>
+            </form>
+
+            <?php if ($missingCount > 0): ?>
+                <form method="post" action="index.php">
+                    <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+                    <input type="hidden" name="action" value="add_recipe_to_shopping_list">
+                    <input type="hidden" name="recipe_id" value="<?= e((string) $recipeId) ?>">
+                    <input type="hidden" name="only_missing" value="1">
+                    <input type="hidden" name="redirect_to" value="index.php?page=recipe&id=<?= e((string) $recipeId) ?>">
+                    <button type="submit" class="secondary-button">Lägg saknade i inköpslista</button>
+                </form>
+
+                <?php if ($googleKeepConnected): ?>
+                    <form method="post" action="index.php">
+                        <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+                        <input type="hidden" name="action" value="send_missing_to_google_keep">
+                        <input type="hidden" name="recipe_id" value="<?= e((string) $recipeId) ?>">
+                        <input type="hidden" name="redirect_to" value="index.php?page=recipe&id=<?= e((string) $recipeId) ?>">
+                        <button type="submit" class="secondary-button">Skicka saknade till Google Keep</button>
+                    </form>
+                <?php elseif (google_keep_is_configured()): ?>
+                    <a href="index.php?page=keep_connect&amp;return_to=<?= e(rawurlencode('index.php?page=recipe&id=' . $recipeId)) ?>" class="secondary-button">Anslut Google Keep</a>
+                <?php endif; ?>
+            <?php endif; ?>
+        </section>
+    <?php endif; ?>
+
+    <?php if ($canManageRecipe): ?>
+        <section class="recipe-manage-panel">
+            <div>
+                <h2>Hantera recept</h2>
+                <p>Du kan redigera eller ta bort det här receptet eftersom du är skapare eller administratör.</p>
+            </div>
+            <div class="recipe-manage-actions">
+                <a href="index.php?page=edit&id=<?= e((string) $recipeId) ?>" class="secondary-button">Redigera recept</a>
+                <form method="post" action="index.php" data-confirm="Ta bort receptet permanent?">
+                    <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+                    <input type="hidden" name="action" value="delete_recipe">
+                    <input type="hidden" name="recipe_id" value="<?= e((string) $recipeId) ?>">
+                    <input type="hidden" name="redirect_to" value="index.php?page=home&mine=1">
+                    <button type="submit" class="danger-button">Ta bort recept</button>
+                </form>
+            </div>
+        </section>
+    <?php endif; ?>
 
     <?php if ($viewer): ?>
         <section class="rating-panel">

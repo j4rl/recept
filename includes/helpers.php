@@ -66,18 +66,30 @@ function slugify(string $value): string
     return $value !== '' ? $value : 'recept';
 }
 
-function unique_recipe_slug(string $title): string
+function unique_recipe_slug(string $title, ?int $ignoreRecipeId = null): string
 {
     $base = slugify($title);
     $slug = $base;
     $count = 1;
 
-    while (db_one('SELECT id FROM recipes WHERE slug = ? LIMIT 1', 's', [$slug])) {
+    while (true) {
+        if ($ignoreRecipeId !== null) {
+            $existing = db_one(
+                'SELECT id FROM recipes WHERE slug = ? AND id <> ? LIMIT 1',
+                'si',
+                [$slug, $ignoreRecipeId]
+            );
+        } else {
+            $existing = db_one('SELECT id FROM recipes WHERE slug = ? LIMIT 1', 's', [$slug]);
+        }
+
+        if (!$existing) {
+            return $slug;
+        }
+
         $count++;
         $slug = $base . '-' . $count;
     }
-
-    return $slug;
 }
 
 function normalize_ingredient_name(string $name): string
@@ -137,4 +149,104 @@ function recipe_image_url(?string $storedPath): string
     $path = str_replace('\\', '/', $path);
 
     return ltrim($path, '/');
+}
+
+function recipe_image_absolute_path(?string $storedPath): ?string
+{
+    $path = trim((string) $storedPath);
+    if ($path === '') {
+        return null;
+    }
+
+    $normalized = ltrim(str_replace('\\', '/', $path), '/');
+    $baseUrl = uploads_base_url();
+
+    if ($baseUrl !== '' && str_starts_with($normalized, $baseUrl . '/')) {
+        $normalized = substr($normalized, strlen($baseUrl) + 1);
+    }
+
+    if ($normalized === '') {
+        return null;
+    }
+
+    return uploads_base_dir() . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $normalized);
+}
+
+function delete_recipe_image_file(?string $storedPath): void
+{
+    $absolutePath = recipe_image_absolute_path($storedPath);
+
+    if ($absolutePath && is_file($absolutePath)) {
+        @unlink($absolutePath);
+    }
+}
+
+function parse_date_input(string $value): ?DateTimeImmutable
+{
+    $date = DateTimeImmutable::createFromFormat('Y-m-d', $value);
+    $errors = DateTimeImmutable::getLastErrors();
+
+    if ($errors === false) {
+        $errors = ['warning_count' => 0, 'error_count' => 0];
+    }
+
+    if (!$date || ($errors['warning_count'] ?? 0) > 0 || ($errors['error_count'] ?? 0) > 0) {
+        return null;
+    }
+
+    return $date->setTime(0, 0, 0);
+}
+
+function week_start(?DateTimeImmutable $date = null): DateTimeImmutable
+{
+    $base = $date ?? new DateTimeImmutable('today');
+    return $base->modify('monday this week')->setTime(0, 0, 0);
+}
+
+function week_dates(DateTimeImmutable $weekStart): array
+{
+    $days = [];
+
+    for ($offset = 0; $offset < 7; $offset++) {
+        $days[] = $weekStart->modify('+' . $offset . ' day');
+    }
+
+    return $days;
+}
+
+function swedish_weekday_name(DateTimeImmutable $date): string
+{
+    $labels = [
+        1 => 'Måndag',
+        2 => 'Tisdag',
+        3 => 'Onsdag',
+        4 => 'Torsdag',
+        5 => 'Fredag',
+        6 => 'Lördag',
+        7 => 'Söndag',
+    ];
+
+    return $labels[(int) $date->format('N')] ?? $date->format('l');
+}
+
+function short_swedish_date(DateTimeImmutable $date): string
+{
+    $months = [
+        1 => 'jan',
+        2 => 'feb',
+        3 => 'mar',
+        4 => 'apr',
+        5 => 'maj',
+        6 => 'jun',
+        7 => 'jul',
+        8 => 'aug',
+        9 => 'sep',
+        10 => 'okt',
+        11 => 'nov',
+        12 => 'dec',
+    ];
+
+    $month = $months[(int) $date->format('n')] ?? $date->format('m');
+
+    return $date->format('j') . ' ' . $month;
 }

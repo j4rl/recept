@@ -1,0 +1,11 @@
+# Todo
+- [x] Lägg till stöd för att redigera och ta bort recept (endast av skaparen och administratörer).
+- [x] Implementera en "favoriter"-funktion där användare kan spara recept de gillar.
+- [x] Lägg till en "senaste recept"-sektion på startsidan som visar de senaste publicerade recepten.
+- [x] Implementera en "mest populära recept"-sektion baserat på stjärnbetyg och antal röster.
+- [x] Lägg till en "recept av dagen"-funktion som slumpmässigt visar ett recept varje dag.
+- [x] Lägg till stöd för att användare kan göra en veckomeny genom att lägga till recept i en "vecko-planerare".
+- [x] Implementera en "inköpslista"-funktion där användare kan lägga till ingredienser från recept och få en sammanställd lista. 
+- [x] Stöd för integration med "Skafferi/Kyl/Frys" för att automatiskt markera ingredienser de redan har hemma.
+- [x] Lägg till stöd för att lägga till saknade ingredienser i recept till Google Keep med OAuth2-autentisering.
+- [x] Implementera en "recepthistorik" där användare kan se vilka recept de har röstat på och när.

@@ -48,6 +48,10 @@ $isMinePage = $page === 'home' && (($_GET['mine'] ?? '') === '1');
                 <a href="index.php?page=home" class="<?= $page === 'home' && !$isMinePage ? 'is-active' : '' ?>">Hem</a>
                 <?php if ($viewer): ?>
                     <a href="index.php?page=home&mine=1" class="<?= $isMinePage ? 'is-active' : '' ?>">Mina recept</a>
+                    <a href="index.php?page=favorites" class="<?= $page === 'favorites' ? 'is-active' : '' ?>">Favoriter</a>
+                    <a href="index.php?page=planner" class="<?= $page === 'planner' ? 'is-active' : '' ?>">Veckoplan</a>
+                    <a href="index.php?page=shopping_list" class="<?= $page === 'shopping_list' ? 'is-active' : '' ?>">Inköpslista</a>
+                    <a href="index.php?page=history" class="<?= $page === 'history' ? 'is-active' : '' ?>">Historik</a>
                     <a href="index.php?page=inventory" class="<?= $page === 'inventory' ? 'is-active' : '' ?>">Skafferi/Kyl/Frys</a>
                     <form action="index.php" method="post" class="inline-form">
                         <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">

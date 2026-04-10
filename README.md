@@ -3,7 +3,14 @@ En receptdatabas med nytt UI/UX i ren PHP, CSS och JavaScript.
 
 ## Funktioner
 - Anonym användare: bläddra recept, sök och filtrera per kategori.
-- Inloggad användare: skapa konto, logga in och publicera recept.
+- Inloggad användare: skapa konto, logga in, publicera recept och redigera eller ta bort egna recept.
+- Administratörer kan hantera alla recept via kolumnen `users.role = 'admin'`.
+- Favoriter: spara recept du vill hitta snabbt igen.
+- Startsidan visar `Recept av dagen`, `Populära recept` och `Senaste recept`.
+- Veckoplanerare: lägg recept på specifika datum och bygg en enkel veckomeny.
+- Inköpslista: lägg till ingredienser från recept, markera klart och se om något redan finns hemma.
+- Recepthistorik: se vilka recept du röstat på och när rösten senast ändrades.
+- Google Keep: skicka saknade ingredienser från en receptsida via OAuth2 om API-nycklar är konfigurerade.
 - Recept kan ligga i flera kategorier samtidigt (t.ex. soppor + vegetariskt).
 - Stjärnrating (1-5): en röst per användare och rösten kan ändras när som helst.
 - Betygsvisning: alltid 5 stjärnor, tomma vid 0 röster och steglöst ifyllda baserat på snittbetyget.
@@ -29,6 +36,11 @@ En receptdatabas med nytt UI/UX i ren PHP, CSS och JavaScript.
 - `RECEPT_UPLOAD_BASE_DIR`: servermapp för uppladdningar (default: `<projekt>/uploads`)
 - `RECEPT_UPLOAD_BASE_URL`: publik sökvägsbas som sparas i DB (default: `uploads`)
 
+## Google Keep-konfiguration
+- `RECEPT_GOOGLE_KEEP_CLIENT_ID`: OAuth2 Client ID för Google Keep-integrationen
+- `RECEPT_GOOGLE_KEEP_CLIENT_SECRET`: OAuth2 Client Secret för Google Keep-integrationen
+- `RECEPT_GOOGLE_KEEP_REDIRECT_URI`: valfri explicit callback-URL, annars används aktuell `index.php?page=keep_callback`
+
 ## Struktur
 - `index.php`: routing och sidrendering
 - `includes/`: bootstrap, auth, db, helpers, actions
@@ -40,3 +52,7 @@ En receptdatabas med nytt UI/UX i ren PHP, CSS och JavaScript.
 - `database/seed_example_recipes.sql`: seed med 24 exempelrecept (3 per kategori), uppdaterad för bred MySQL-kompatibilitet
 - `recipe_categories`: koppling mellan recept och flera kategorier
 - `recipe_ratings`: användarröster (1-5 stjärnor)
+- `recipe_favorites`: sparade favoritrecept per användare
+- `meal_plan_items`: veckoplanens recept per datum
+- `shopping_list_items`: användarens inköpslista
+- `google_keep_tokens`: OAuth2-tokenlagring för Google Keep

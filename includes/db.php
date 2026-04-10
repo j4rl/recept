@@ -79,6 +79,31 @@ function db_execute(string $sql, string $types = '', array $params = []): int
     return $affected;
 }
 
+function db_column_exists(string $table, string $column): bool
+{
+    static $cache = [];
+
+    $cacheKey = $table . '.' . $column;
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
+
+    $row = db_one(
+        'SELECT 1
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = ?
+           AND COLUMN_NAME = ?
+         LIMIT 1',
+        'ss',
+        [$table, $column]
+    );
+
+    $cache[$cacheKey] = $row !== null;
+
+    return $cache[$cacheKey];
+}
+
 function db_bind(mysqli_stmt $statement, string $types, array $params): void
 {
     if ($types === '') {

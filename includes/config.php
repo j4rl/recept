@@ -9,5 +9,8 @@ return [
     'db_port' => (int) (getenv('RECEPT_DB_PORT') ?: 3306),
     'upload_base_dir' => getenv('RECEPT_UPLOAD_BASE_DIR') ?: dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads',
     'upload_base_url' => getenv('RECEPT_UPLOAD_BASE_URL') ?: 'uploads',
+    'google_keep_client_id' => getenv('RECEPT_GOOGLE_KEEP_CLIENT_ID') ?: '',
+    'google_keep_client_secret' => getenv('RECEPT_GOOGLE_KEEP_CLIENT_SECRET') ?: '',
+    'google_keep_redirect_uri' => getenv('RECEPT_GOOGLE_KEEP_REDIRECT_URI') ?: '',
     'app_name' => 'Matarkiv',
 ];
